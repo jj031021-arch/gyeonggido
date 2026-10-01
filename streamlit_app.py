@@ -1,12 +1,26 @@
-
+import importlib
 import importlib.util
 import subprocess
 import sys
 
-# 배포 환경에 openpyxl이 없으면 자동 설치 (requirements.txt가 적용되지 않은 경우 대비)
-for _pkg in ("openpyxl",):
-    if importlib.util.find_spec(_pkg) is None:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", _pkg])
+
+def _ensure(pkg):
+    """패키지가 없으면 설치를 시도 (pip → uv 순). 성공 여부만 반환하고 앱은 죽이지 않음."""
+    if importlib.util.find_spec(pkg):
+        return True
+    for cmd in ([sys.executable, "-m", "pip", "install", "-q", pkg],
+                ["uv", "pip", "install", "--python", sys.executable, "-q", pkg]):
+        try:
+            subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            importlib.invalidate_caches()
+            if importlib.util.find_spec(pkg):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+_HAS_OPENPYXL = _ensure("openpyxl")
 
 import io
 import re
@@ -138,6 +152,13 @@ def to_excel_bytes(summary: pd.DataFrame, detail: pd.DataFrame) -> bytes:
 
 # ===================== 화면 =====================
 st.set_page_config(page_title="요구자료 겹침 찾기", page_icon="📑", layout="wide")
+
+if not _HAS_OPENPYXL:
+    st.error("엑셀을 읽는 패키지(openpyxl)가 설치되지 않았습니다. "
+             "GitHub 저장소 맨 위에 requirements.txt 파일을 만들고 아래 3줄을 넣은 뒤 "
+             "Manage app → Reboot app 을 눌러 주세요.")
+    st.code("streamlit\npandas\nopenpyxl")
+    st.stop()
 st.title("📑 요구자료 겹침 찾기")
 st.caption("엑셀 여러 개를 올리면 자료명이 겹치는(비슷한) 항목을 의원명·연번과 함께 뽑아줍니다.")
 
