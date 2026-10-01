@@ -1,3 +1,13 @@
+
+import importlib.util
+import subprocess
+import sys
+
+# 배포 환경에 openpyxl이 없으면 자동 설치 (requirements.txt가 적용되지 않은 경우 대비)
+for _pkg in ("openpyxl",):
+    if importlib.util.find_spec(_pkg) is None:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", _pkg])
+
 import io
 import re
 from collections import Counter
